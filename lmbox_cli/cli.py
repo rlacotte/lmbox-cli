@@ -11,7 +11,7 @@ import typer
 from rich.console import Console
 
 from lmbox_cli import __version__
-from lmbox_cli.commands import new, test, validate
+from lmbox_cli.commands import build, new, test, validate
 
 console = Console()
 
@@ -38,6 +38,7 @@ app.add_typer(agent_app)
 agent_app.command("new")(new.cmd)
 agent_app.command("validate")(validate.cmd)
 agent_app.command("test")(test.cmd)
+agent_app.command("build")(build.cmd)
 
 
 @app.callback(invoke_without_command=True)
