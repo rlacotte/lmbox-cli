@@ -91,7 +91,7 @@ The full story is in [docs.lmbox.eu/agent-sdk](https://docs.lmbox.eu/agent-sdk).
 | `lmbox agent test` | ✅ shipped (0.2) | Run golden evals against a local LLM (OpenAI-compatible: Ollama, LiteLLM, vLLM). |
 | `lmbox agent build` | ✅ shipped (0.3) | Compile manifest → kernel-native bundle (SKILL.md for OpenClaw). Pluggable adapter — future kernels swap in without touching agent sources. |
 | `lmbox agent pack` | ✅ shipped (0.4) | Bundle a built agent into a reproducible signed .lmbox tarball (HMAC-SHA256). Air-gap-friendly. |
-| `lmbox agent deploy --box <serial>` | 🚧 next (0.4) | Wrap pack + upload to cloud + queue install via heartbeat. |
+| `lmbox agent deploy --box <serial>` | ✅ shipped (0.4) | Full pipeline: build → pack → upload to cloud → queue install via heartbeat. |
 | `lmbox agent logs <slug>` | 🚧 0.5 | Tail execution logs from a box. |
 
 ## Available templates
