@@ -49,10 +49,22 @@ Issues = "https://github.com/rlacotte/lmbox-cli/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["lmbox_cli"]
+# Templates + schema are inside lmbox_cli/, so they're picked up by
+# the package include automatically. Hatchling does NOT skip non-.py
+# files (unlike setuptools default). No need for force-include.
 
-[tool.hatch.build.targets.wheel.force-include]
-"lmbox_cli/templates" = "lmbox_cli/templates"
-"lmbox_cli/schema" = "lmbox_cli/schema"
+[tool.hatch.build.targets.sdist]
+# Source distributions ship everything tracked by git, plus the LICENSE
+# and pyproject.toml. Tests are included so `python -m pytest`
+# works on a fresh untarred source.
+include = [
+  "lmbox_cli/**",
+  "tests/**",
+  "docs/**",
+  "LICENSE",
+  "README.md",
+  "pyproject.toml",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -64,4 +76,7 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "RUF"]
-ignore = ["E501"]
+# B008 is incompatible with Typer's idiom of using `typer.Argument(...)` /
+# `typer.Option(...)` as default values — that's exactly how Typer
+# discovers parameter metadata. E501 is handled by the formatter.
+ignore = ["E501", "B008"]

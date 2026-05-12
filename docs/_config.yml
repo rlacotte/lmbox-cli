@@ -1,0 +1,33 @@
+# Jekyll config for GitHub Pages.
+# Minimal setup — uses the `minima` theme that ships by default
+# with GitHub Pages. No additional gems to manage.
+
+title: LMbox Agent SDK
+description: Architecture decisions and reference for partners building agents on the LMbox appliance.
+url: https://rlacotte.github.io
+baseurl: /lmbox-cli
+
+# Use the Minima theme (default GitHub Pages theme)
+theme: minima
+
+# Surface ADRs in the navigation
+header_pages:
+  - adr/001-agent-manifest.md
+
+# Polite to crawlers — the source repo is open already
+plugins:
+  - jekyll-relative-links
+
+# Convert .md links to .html so internal links work after Jekyll builds
+relative_links:
+  enabled: true
+  collections: true
+
+include:
+  - adr
+
+# Don't process the README.md at root — it's repo-level, not docs
+exclude:
+  - README.md
+  - "*.swp"
+  - ".DS_Store"

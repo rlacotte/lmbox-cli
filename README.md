@@ -1,5 +1,11 @@
 # lmbox-cli
 
+[![Test](https://github.com/rlacotte/lmbox-cli/actions/workflows/test.yml/badge.svg)](https://github.com/rlacotte/lmbox-cli/actions/workflows/test.yml)
+[![Pages](https://github.com/rlacotte/lmbox-cli/actions/workflows/pages.yml/badge.svg)](https://rlacotte.github.io/lmbox-cli/)
+[![PyPI](https://img.shields.io/pypi/v/lmbox-cli.svg)](https://pypi.org/project/lmbox-cli/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](pyproject.toml)
+
 The partner-facing CLI to scaffold, validate, test, and deploy
 **LMbox agents** — sovereign AI agents that run on the LMbox
 appliance inside a customer's own infrastructure.

@@ -26,7 +26,6 @@ import re
 import shutil
 from datetime import date
 from pathlib import Path
-from typing import Optional
 
 import typer
 from jinja2 import Template
@@ -51,7 +50,8 @@ def cmd(
     ),
     template: str = typer.Option(
         "_base",
-        "--template", "-t",
+        "--template",
+        "-t",
         help="Template to scaffold from. Use `_base` for an empty minimal agent.",
     ),
     vendor: str = typer.Option(
@@ -64,9 +64,10 @@ def cmd(
         "--vertical",
         help="Vertical category — legal | finance | health | hr | sales | dev | ops | compliance | public | industry | generic",
     ),
-    output_dir: Optional[Path] = typer.Option(
+    output_dir: Path | None = typer.Option(
         None,
-        "--output-dir", "-o",
+        "--output-dir",
+        "-o",
         help="Parent directory for the new agent (default: current directory).",
     ),
     force: bool = typer.Option(

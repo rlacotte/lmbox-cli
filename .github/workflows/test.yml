@@ -1,0 +1,64 @@
+name: Test
+
+# Run on every push to main + every PR. Matrix across the Python
+# versions we promise to support in pyproject.toml. This is the
+# contract — if the matrix shrinks, bump the classifiers.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    name: pytest · py${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install (editable + dev extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run pytest
+        run: pytest -v --cov=lmbox_cli --cov-report=term-missing
+
+      - name: Smoke-test CLI (scaffold + validate)
+        # Beyond unit tests, exercise the real entrypoint script the
+        # user would run. Catches packaging bugs (missing template
+        # files, scripts entry-point typos) that unit tests miss.
+        run: |
+          set -e
+          tmp=$(mktemp -d)
+          lmbox --version
+          lmbox agent new smoke-test -o "$tmp"
+          lmbox agent validate "$tmp/smoke-test"
+          lmbox agent new legal-smoke -t legal-document -o "$tmp" --vendor sopra
+          lmbox agent validate "$tmp/legal-smoke"
+
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check lmbox_cli tests
+      - run: ruff format --check lmbox_cli tests

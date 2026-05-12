@@ -21,9 +21,7 @@ runner = CliRunner()
 
 def _scaffold(tmp_path: Path, slug: str = "my-agent", template: str = "_base") -> Path:
     """Helper — produce a known-valid scaffold and return its directory."""
-    result = runner.invoke(
-        app, ["agent", "new", slug, "-t", template, "-o", str(tmp_path)]
-    )
+    result = runner.invoke(app, ["agent", "new", slug, "-t", template, "-o", str(tmp_path)])
     assert result.exit_code == 0, result.stdout
     return tmp_path / slug
 
@@ -76,7 +74,11 @@ def test_missing_referenced_file_detected(tmp_path: Path) -> None:
     result = runner.invoke(app, ["agent", "validate", str(agent)])
     assert result.exit_code == 1
     assert "system.md" in result.stdout
-    assert "don't exist" in result.stdout or "does not exist" in result.stdout or "exist" in result.stdout
+    assert (
+        "don't exist" in result.stdout
+        or "does not exist" in result.stdout
+        or "exist" in result.stdout
+    )
 
 
 def test_validate_accepts_explicit_manifest_path(tmp_path: Path) -> None:

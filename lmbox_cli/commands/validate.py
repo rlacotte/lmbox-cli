@@ -15,7 +15,6 @@ Exit codes
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -27,7 +26,7 @@ console = Console()
 
 
 def cmd(
-    path: Optional[Path] = typer.Argument(
+    path: Path | None = typer.Argument(
         None,
         help="Path to the agent directory or directly to a manifest.yaml. Defaults to current dir.",
     ),
@@ -83,13 +82,16 @@ def cmd(
     table.add_row("model", sp["model"]["primary"])
     table.add_row("tools", str(len(sp.get("tools", []))))
     connectors = sp.get("connectors") or {}
-    table.add_row("connectors", f"{len(connectors.get('required', []))} required, {len(connectors.get('optional', []))} optional")
+    table.add_row(
+        "connectors",
+        f"{len(connectors.get('required', []))} required, {len(connectors.get('optional', []))} optional",
+    )
 
     console.print("[green]✓ Valid manifest[/green]")
     console.print(table)
 
 
-def _resolve_manifest_path(path: Optional[Path]) -> Optional[Path]:
+def _resolve_manifest_path(path: Path | None) -> Path | None:
     """Figure out which file the user means.
 
     - No path given → ./manifest.yaml in cwd.
