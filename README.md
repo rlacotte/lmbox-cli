@@ -88,8 +88,8 @@ The full story is in [docs.lmbox.eu/agent-sdk](https://docs.lmbox.eu/agent-sdk).
 |---|---|---|
 | `lmbox agent new <slug>` | ✅ shipped (0.1) | Scaffold from a template. |
 | `lmbox agent validate` | ✅ shipped (0.1) | Schema + cross-reference checks. |
-| `lmbox agent test` | 🚧 next (0.2) | Run golden evals against a local LLM. |
-| `lmbox agent build` | 🚧 next (0.2) | Compile manifest → kernel-native bundle. |
+| `lmbox agent test` | ✅ shipped (0.2) | Run golden evals against a local LLM (OpenAI-compatible: Ollama, LiteLLM, vLLM). |
+| `lmbox agent build` | 🚧 next (0.3) | Compile manifest → kernel-native bundle (SKILL.md for OpenClaw). |
 | `lmbox agent deploy --box <serial>` | 🚧 0.3 | Push signed bundle via heartbeat. |
 | `lmbox agent logs <slug>` | 🚧 0.3 | Tail execution logs. |
 
