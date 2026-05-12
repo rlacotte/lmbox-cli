@@ -1,0 +1,1 @@
+{"id": "smoke-001", "input": "Hello, who are you?", "expected": {"contains": ["{{display_name}}"]}, "tolerance": 1.0}

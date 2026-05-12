@@ -1,0 +1,3 @@
+{"id": "legal-001-identify-nda", "input": "Voici un document de 2 pages intitulé 'Non-Disclosure Agreement' entre Acme Corp et notre société. Quel est le type de document ?", "expected": {"contains": ["NDA"]}, "tolerance": 1.0}
+{"id": "legal-002-flag-auto-renewal", "input": "Le contrat prévoit un renouvellement automatique tous les 5 ans sauf préavis de 60 jours. Est-ce que ça doit être flagué ?", "expected": {"contains": ["renouvellement", "automatique"]}, "tolerance": 0.8}
+{"id": "legal-003-cite-library", "input": "Pour une clause de limitation de responsabilité plafonnée à 12 mois de facturation, est-ce conforme à notre template interne ?", "expected": {"contains": ["search_clause_library"]}, "tolerance": 0.7}

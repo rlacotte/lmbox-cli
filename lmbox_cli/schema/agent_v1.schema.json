@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lmbox.eu/schemas/agent-v1.json",
+  "title": "LMbox Agent Manifest",
+  "description": "Schema for the manifest.yaml at the root of an LMbox agent project. See ADR-001 in the lmbox-cli repo for the design rationale.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "enum": ["lmbox.eu/v1"],
+      "description": "Contract version. Bump to v2 only on breaking changes."
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["Agent"],
+      "description": "Resource kind. Reserved for forward compatibility (AgentBundle, AgentTemplate)."
+    },
+
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slug", "version", "vendor", "display_name", "description"],
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{2,63}$",
+          "description": "kebab-case identifier, 3 to 64 chars. Must be unique per vendor."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[A-Za-z0-9.-]+)?$",
+          "description": "Semantic version (MAJOR.MINOR.PATCH with optional prerelease suffix)."
+        },
+        "vendor": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,40}$",
+          "description": "The author of the agent. 'lmbox' for first-party, partner slug otherwise."
+        },
+        "vertical": {
+          "type": "string",
+          "enum": [
+            "generic", "legal", "finance", "health", "hr",
+            "sales", "dev", "ops", "compliance", "public", "industry"
+          ],
+          "default": "generic"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 80,
+          "description": "Human-facing name shown in OWUI and the marketplace."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 500,
+          "description": "One-paragraph description of what this agent does."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,30}$" },
+          "uniqueItems": true,
+          "default": []
+        }
+      }
+    },
+
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "prompts", "evals"],
+      "properties": {
+        "model": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["primary"],
+          "properties": {
+            "primary": {
+              "type": "string",
+              "description": "Name registered in LiteLLM (e.g. mistral-large-2, gemma3-27b, qwen3-32b).",
+              "examples": ["mistral-large-2", "gemma3-27b", "qwen3-32b"]
+            },
+            "fallback": {
+              "type": "string",
+              "description": "Used if `primary` returns an error or is unavailable on the box."
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2,
+              "default": 0.2
+            },
+            "max_tokens": {
+              "type": "integer",
+              "minimum": 64,
+              "maximum": 128000,
+              "default": 4096
+            }
+          }
+        },
+
+        "prompts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["system"],
+          "properties": {
+            "system": {
+              "type": "string",
+              "description": "Path to the system prompt file, relative to manifest.yaml.",
+              "pattern": "^prompts/[A-Za-z0-9_\\-/.]+\\.(md|txt|j2)$"
+            }
+          }
+        },
+
+        "tools": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "type", "description"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{1,63}$",
+                "description": "snake_case identifier used by the LLM in function calls."
+              },
+              "type": {
+                "type": "string",
+                "enum": ["rag", "action", "http", "shell"],
+                "description": "Execution backend. 'rag' = vector search, 'action' = write op, 'http' = REST call, 'shell' = sandboxed command."
+              },
+              "source": {
+                "type": "string",
+                "description": "Resource reference for rag/action tools (e.g. connectors.sharepoint.contracts)."
+              },
+              "description": {
+                "type": "string",
+                "minLength": 10,
+                "maxLength": 300,
+                "description": "Description shown to the LLM via the function-calling schema."
+              }
+            }
+          }
+        },
+
+        "connectors": {
+          "type": "object",
+          "additionalProperties": false,
+          "default": { "required": [], "optional": [] },
+          "properties": {
+            "required": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,40}$" },
+              "uniqueItems": true,
+              "description": "LMbox connector slugs that MUST be active on the box for this agent to install."
+            },
+            "optional": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,40}$" },
+              "uniqueItems": true,
+              "description": "Connectors that enhance the agent if present, but are not blocking."
+            }
+          }
+        },
+
+        "evals": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["golden"],
+          "properties": {
+            "pass_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.8,
+              "description": "Fraction of golden cases that must pass for `lmbox agent test` to exit 0."
+            },
+            "golden": {
+              "type": "string",
+              "pattern": "^evals/[A-Za-z0-9_\\-/.]+\\.jsonl$",
+              "description": "Path to the JSONL file containing golden test cases."
+            }
+          }
+        },
+
+        "deployment": {
+          "type": "object",
+          "additionalProperties": false,
+          "default": { "audit": true, "rgpd_redact": [] },
+          "properties": {
+            "owui_role": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{1,40}$",
+              "description": "OWUI role group that can invoke this agent. Mapped to AD groups via Authentik."
+            },
+            "audit": {
+              "type": "boolean",
+              "default": true,
+              "description": "When true, every invocation produces an AuditLog entry in the chain."
+            },
+            "rgpd_redact": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["email", "phone", "iban", "nir", "siren", "address", "fullname", "all"]
+              },
+              "uniqueItems": true,
+              "default": [],
+              "description": "PII tags to strip from input/output before any cloud LLM call. Local-model calls are exempt."
+            }
+          }
+        },
+
+        "runtime_hints": {
+          "type": "object",
+          "additionalProperties": true,
+          "default": {},
+          "description": "Kernel-specific overrides. Keys are kernel names (openclaw, hermes, lmbox-native). Adapters ignore keys for other kernels."
+        }
+      }
+    }
+  }
+}

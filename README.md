@@ -1,0 +1,118 @@
+# lmbox-cli
+
+The partner-facing CLI to scaffold, validate, test, and deploy
+**LMbox agents** — sovereign AI agents that run on the LMbox
+appliance inside a customer's own infrastructure.
+
+> **Status — Alpha (0.1.x)** · Schema is locked at `lmbox.eu/v1` ;
+> the runtime adapter targets OpenClaw ; the deploy pipeline is in
+> active development. See [docs/adr/](docs/adr/) for the design
+> decisions that are stable.
+
+## Install
+
+```bash
+pip install lmbox-cli
+# or
+pipx install lmbox-cli
+```
+
+Then verify :
+
+```bash
+$ lmbox --version
+lmbox 0.1.0
+```
+
+## Quick start (5 minutes)
+
+```bash
+# 1. Scaffold a new agent from the base template
+lmbox agent new my-first-agent
+
+# 2. Or scaffold from a vertical template (legal-document is shipped)
+lmbox agent new contract-review --template legal-document --vendor sopra
+
+# 3. Edit, then validate
+cd contract-review
+$EDITOR manifest.yaml
+$EDITOR prompts/system.md
+lmbox agent validate
+
+# 4. Coming next: `lmbox agent test` (local evals) + `lmbox agent deploy`
+```
+
+## What is an LMbox agent?
+
+A directory with:
+
+```
+my-agent/
+├── manifest.yaml         # the contract — see ADR-001
+├── prompts/system.md     # the system prompt
+├── tools/                # optional Python tool implementations
+├── evals/golden.jsonl    # golden test cases
+└── README.md             # human-facing description
+```
+
+The `manifest.yaml` is **kernel-agnostic** : it documents what the
+agent does, what it needs, and how to evaluate it. The CLI compiles
+it down to whatever runtime the LMbox appliance ships (OpenClaw
+today, potentially other kernels later). Partners write once.
+
+## Why this exists
+
+LMbox appliances ship a runtime that runs locally inside the
+customer's network — zero data leaves. Building useful agents on
+top of that runtime used to take an integrator **15 days per agent**
+(prompt engineering, RAG plumbing, connector wiring, eval harness,
+deployment). The Agent SDK collapses that to **2-4 days** per agent
+by giving partners:
+
+- A neutral manifest format (this CLI's `manifest.yaml`)
+- Templates pre-wired for common verticals (legal, finance, health, ...)
+- A local eval harness (`lmbox agent test`)
+- A signed-deployment path via the LMbox heartbeat command queue
+
+The full story is in [docs.lmbox.eu/agent-sdk](https://docs.lmbox.eu/agent-sdk).
+
+## Commands
+
+| Command | Status | Purpose |
+|---|---|---|
+| `lmbox agent new <slug>` | ✅ shipped (0.1) | Scaffold from a template. |
+| `lmbox agent validate` | ✅ shipped (0.1) | Schema + cross-reference checks. |
+| `lmbox agent test` | 🚧 next (0.2) | Run golden evals against a local LLM. |
+| `lmbox agent build` | 🚧 next (0.2) | Compile manifest → kernel-native bundle. |
+| `lmbox agent deploy --box <serial>` | 🚧 0.3 | Push signed bundle via heartbeat. |
+| `lmbox agent logs <slug>` | 🚧 0.3 | Tail execution logs. |
+
+## Available templates
+
+| Template | Vertical | What it scaffolds |
+|---|---|---|
+| `_base` | generic | Minimal agent that passes `validate` immediately. |
+| `legal-document` | legal | Contract / NDA / SOW review with SharePoint RAG + Outlook reply. |
+
+More templates land each release. Partners can ship their own
+template by dropping it under `lmbox_cli/templates/` and submitting
+a PR.
+
+## Develop on the CLI itself
+
+```bash
+git clone https://github.com/rlacotte/lmbox-cli
+cd lmbox-cli
+pip install -e ".[dev]"
+pytest
+```
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).
+
+## Links
+
+- [docs.lmbox.eu/agent-sdk](https://docs.lmbox.eu/agent-sdk) — full guide
+- [lmbox.eu/partenaires](https://lmbox.eu/partenaires) — partner program
+- [docs/adr/](docs/adr/) — architecture decision records

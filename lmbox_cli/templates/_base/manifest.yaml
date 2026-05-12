@@ -1,0 +1,47 @@
+# LMbox Agent Manifest — see docs/adr/001-agent-manifest.md
+# Generated on {{today}} by `lmbox agent new {{slug}}`.
+
+apiVersion: lmbox.eu/v1
+kind: Agent
+
+metadata:
+  slug: {{slug}}
+  version: 0.1.0
+  vendor: {{vendor}}
+  vertical: {{vertical}}
+  display_name: {{display_name}}
+  description: >-
+    TODO: describe what this agent does in 1-2 sentences. Will appear
+    in the LMbox portal and the partner marketplace.
+
+spec:
+  model:
+    # Pick a model registered in your LMbox LiteLLM proxy.
+    # Common choices: mistral-large-2, gemma3-27b, qwen3-32b.
+    primary: mistral-large-2
+    temperature: 0.2
+    max_tokens: 4096
+
+  prompts:
+    system: prompts/system.md
+
+  # Add function-call tools here. Each tool becomes a callable from
+  # the LLM via the underlying runtime (OpenClaw today).
+  tools: []
+
+  # Declare which LMbox connectors this agent needs.
+  connectors:
+    required: []
+    optional: []
+
+  evals:
+    # Fraction of golden cases that must pass. 0.8 is a good start.
+    pass_threshold: 0.8
+    golden: evals/golden.jsonl
+
+  deployment:
+    # Every invocation produces an entry in LMbox AuditLog.
+    audit: true
+    # PII tags stripped before any cloud LLM call (local-model calls
+    # are exempt). See ADR-001 for the full list.
+    rgpd_redact: []

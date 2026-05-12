@@ -1,0 +1,6 @@
+# LMbox agent — generated build artifacts
+.build/
+.lmbox-cache/
+*.pyc
+__pycache__/
+.DS_Store

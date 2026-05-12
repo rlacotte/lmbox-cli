@@ -1,0 +1,70 @@
+# LMbox Agent Manifest — Legal Document template
+# Generated on {{today}} by `lmbox agent new {{slug}} --template legal-document`.
+
+apiVersion: lmbox.eu/v1
+kind: Agent
+
+metadata:
+  slug: {{slug}}
+  version: 0.1.0
+  vendor: {{vendor}}
+  vertical: legal
+  display_name: {{display_name}}
+  description: >-
+    Analyses incoming legal documents (contracts, NDAs, statements of
+    work), flags non-standard clauses against the customer's internal
+    templates, and produces a redlined memo for the responsible lawyer.
+
+  tags: [legal, contract, redline, nda]
+
+spec:
+  model:
+    # Mistral Large 2 is a solid default for legal reasoning in French.
+    # Switch to qwen3-32b if you need stronger multilingual support.
+    primary: mistral-large-2
+    fallback: gemma3-27b
+    temperature: 0.1
+    max_tokens: 8192
+
+  prompts:
+    system: prompts/system.md
+
+  tools:
+    - name: search_clause_library
+      type: rag
+      source: connectors.sharepoint.legal-templates
+      description: >-
+        Searches the customer's internal clause library for standard
+        templates to compare the incoming document against.
+
+    - name: search_jurisprudence
+      type: rag
+      source: connectors.sharepoint.jurisprudence
+      description: >-
+        Retrieves relevant past matters and internal memos by topic.
+
+    - name: send_review_email
+      type: action
+      source: connectors.outlook
+      description: >-
+        Sends the final redlined memo to the responsible lawyer with
+        the deal name in the subject.
+
+  connectors:
+    required:
+      - sharepoint
+    optional:
+      - outlook
+      - jira
+
+  evals:
+    pass_threshold: 0.85
+    golden: evals/golden.jsonl
+
+  deployment:
+    owui_role: legal
+    audit: true
+    rgpd_redact:
+      - nir
+      - iban
+      - phone
