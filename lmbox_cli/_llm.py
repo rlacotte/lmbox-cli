@@ -21,7 +21,9 @@ Tests inject `FakeLLMClient` instead of `OpenAIClient`.
 
 from __future__ import annotations
 
+import json
 import os
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Protocol
 from urllib.parse import urljoin
@@ -51,9 +53,25 @@ class CompletionResponse:
 
 
 class LLMClient(Protocol):
-    """The only operation the eval runner needs."""
+    """Operations exposed by the LMbox LLM client.
+
+    `complete` is the one-shot path used by the eval runner. `stream`
+    is the incremental path used by the runtime guard (Layer B) — the
+    GuardedStream wraps it and intercepts hallucinated citations the
+    moment they're emitted, before the full response is buffered.
+    """
 
     def complete(self, req: CompletionRequest) -> CompletionResponse: ...
+
+    def stream(self, req: CompletionRequest) -> Iterator[str]:
+        """Yield content chunks as the model generates them.
+
+        Each yielded value is a string (may be empty). Implementations
+        MUST close the underlying HTTP connection on caller cleanup —
+        the GuardedStream relies on this to cancel generation when
+        a CRITICAL violation is detected in strict mode.
+        """
+        ...
 
 
 class OpenAIClient:
@@ -103,6 +121,56 @@ class OpenAIClient:
             prompt_tokens=int(usage.get("prompt_tokens", 0)),
             completion_tokens=int(usage.get("completion_tokens", 0)),
         )
+
+    def stream(self, req: CompletionRequest) -> Iterator[str]:
+        """Stream content chunks using OpenAI-compatible SSE.
+
+        Each SSE event is `data: {json}\\n\\n`. We parse the `delta.content`
+        out of each chunk and yield it. The terminating `data: [DONE]`
+        signal ends the iteration. HTTP-level errors are raised as
+        httpx.HTTPStatusError so the GuardedStream can fall back.
+        """
+        payload = {
+            "model": req.model,
+            "messages": [
+                {"role": "system", "content": req.system},
+                {"role": "user", "content": req.user},
+            ],
+            "temperature": req.temperature,
+            "max_tokens": req.max_tokens,
+            "stream": True,
+        }
+        url = urljoin(self._base, "chat/completions")
+        # Use a Client (not a context manager) so the GuardedStream can
+        # close the underlying connection mid-stream to cancel generation.
+        client = httpx.Client(timeout=self._timeout)
+        try:
+            with client.stream(
+                "POST", url, json=payload, headers=self._headers
+            ) as resp:
+                resp.raise_for_status()
+                for line in resp.iter_lines():
+                    if not line:
+                        continue
+                    if line.startswith("data: "):
+                        line = line[6:]
+                    if line.strip() == "[DONE]":
+                        return
+                    try:
+                        event = json.loads(line)
+                    except json.JSONDecodeError:
+                        # Tolerate keep-alive / unknown lines; LiteLLM
+                        # sometimes emits comment frames.
+                        continue
+                    choices = event.get("choices") or []
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta") or {}
+                    chunk = delta.get("content")
+                    if chunk:
+                        yield chunk
+        finally:
+            client.close()
 
 
 def from_env(

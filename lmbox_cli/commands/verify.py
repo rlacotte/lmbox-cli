@@ -53,10 +53,9 @@ console = Console()
 
 def cmd(
     path: Path = typer.Argument(
-        ...,
-        exists=True,
-        readable=True,
-        help="Path to the text file to verify (the agent's generated output).",
+        None,
+        help="Path to the text file to verify (the agent's generated output). "
+        "Optional when --list-checks is used.",
     ),
     pieces: str | None = typer.Option(
         None,
@@ -81,8 +80,43 @@ def cmd(
         help="Emit the report as JSON instead of a human table. "
         "Suitable for piping into downstream pipelines / CI.",
     ),
+    list_checks: bool = typer.Option(
+        False,
+        "--list-checks",
+        help="Print every check the verifier knows about (citation families "
+        "+ external lookup endpoints) and exit. No file argument required.",
+    ),
+    export_report: Path | None = typer.Option(
+        None,
+        "--export-report",
+        help="Write the full JSON report to this file IN ADDITION to "
+        "console output. Useful when piping a human table to the terminal "
+        "while archiving a machine-readable report for the audit trail.",
+    ),
+    severity_threshold: str = typer.Option(
+        "high",
+        "--severity",
+        help="Minimum severity that triggers exit code 1. "
+        "Choices: critical / high / medium / low. Default: high (HIGH and "
+        "CRITICAL fail the run; MEDIUM unverifiable do not).",
+    ),
 ) -> None:
     """Run the citation verifier on an agent-generated text."""
+
+    if list_checks:
+        _emit_list_checks()
+        raise typer.Exit(code=0)
+
+    if path is None:
+        console.print("[red]Argument manquant : chemin du fichier à vérifier.[/red]")
+        console.print("Usage : [bold]lmbox agent verify <path>[/bold]  "
+                      "(ou --list-checks pour lister les contrôles).")
+        raise typer.Exit(code=2)
+    if not path.exists():
+        console.print(f"[red]Fichier introuvable : {path}[/red]")
+        raise typer.Exit(code=2)
+
+    threshold = _parse_severity(severity_threshold)
 
     text = path.read_text(encoding="utf-8")
     pieces_list = (
@@ -102,7 +136,14 @@ def cmd(
     else:
         _emit_human(report, pieces_list)
 
-    if not report.ok:
+    if export_report is not None:
+        export_report.parent.mkdir(parents=True, exist_ok=True)
+        export_report.write_text(_report_to_json(report), encoding="utf-8")
+        if not json_output:
+            console.print(f"[dim]Rapport JSON archivé : {export_report}[/dim]")
+
+    # Exit code is driven by the severity threshold
+    if _has_violation_at_or_above(report, threshold):
         raise typer.Exit(code=1)
 
 
@@ -180,6 +221,10 @@ def _emit_human(report, pieces_list) -> None:
 
 
 def _emit_json(report) -> None:
+    print(_report_to_json(report))
+
+
+def _report_to_json(report) -> str:
     import json
 
     out = {
@@ -199,4 +244,67 @@ def _emit_json(report) -> None:
             for v in report.violations
         ],
     }
-    print(json.dumps(out, ensure_ascii=False, indent=2))
+    return json.dumps(out, ensure_ascii=False, indent=2)
+
+
+def _emit_list_checks() -> None:
+    """Print every check the verifier supports — discoverable docs
+    for partners writing pipelines around it."""
+    table = Table(
+        title="Checks réalisés par le verifier",
+        show_lines=True,
+        title_style="bold",
+        title_justify="left",
+    )
+    table.add_column("Famille", style="bold", width=22)
+    table.add_column("Source", width=22)
+    table.add_column("Détecte", overflow="fold")
+
+    rows = [
+        ("Cassation",          "Légifrance JURI",     "Cass. Com., Soc., Civ., Crim. — pourvoi, date, formation"),
+        ("Conseil d'État",     "Légifrance CETAT",    "CE, n° XXXXXX — arrêts admin"),
+        ("Conseil const.",     "Légifrance CONSTIT",  "Cons. const. DC / QPC / LP"),
+        ("Cour d'appel",       "Légifrance JURI",     "CA Paris, Versailles, Lyon… (couverture partielle)"),
+        ("Article de Code",    "Légifrance CODE",     "L./R./D. + ID Code (13 codes mappés, 6 acronymes)"),
+        ("Loi / ordonnance",   "Légifrance JORF",     "Loi ou ordonnance n° AAAA-NNNN du jour mois année"),
+        ("Décret",             "Légifrance JORF",     "Décret n° AAAA-NNNN du jour mois année"),
+        ("Règlement UE",       "EUR-Lex CELEX",       "Règlement (UE) AAAA/NNNN → 3AAAARNNNN"),
+        ("Directive UE",       "EUR-Lex CELEX",       "Directive AAAA/NNNN/UE → 3AAAALNNNN"),
+        ("Pièce interne",      "Inventaire dossier",  "Pièce n° X, Pièces n°s 4 à 7, Pièces n°s 4, 5 et 12"),
+        ("Citation malformée", "Structural",          "Mois invalide (jav), séparateur incorrect, mixte FR/EN"),
+    ]
+    for family, source, what in rows:
+        table.add_row(family, source, what)
+    console.print(table)
+    console.print(
+        "\n[dim]Sévérités émises : "
+        "[red]CRITICAL[/red] (référence inexistante / malformée), "
+        "[magenta]HIGH[/magenta] (pièce hors dossier), "
+        "[yellow]MEDIUM[/yellow] (non vérifiable — clé API absente ou API down), "
+        "[dim white]LOW[/dim white] (informationnel).[/dim]"
+    )
+
+
+_SEVERITY_RANK = {
+    Severity.LOW: 0,
+    Severity.MEDIUM: 1,
+    Severity.HIGH: 2,
+    Severity.CRITICAL: 3,
+}
+
+
+def _parse_severity(s: str) -> Severity:
+    try:
+        return Severity(s.lower())
+    except ValueError:
+        console.print(
+            f"[red]Sévérité inconnue : '{s}'. "
+            f"Choix : critical / high / medium / low.[/red]"
+        )
+        raise typer.Exit(code=2)
+
+
+def _has_violation_at_or_above(report, threshold: Severity) -> bool:
+    """True iff at least one violation has severity >= threshold."""
+    needed = _SEVERITY_RANK[threshold]
+    return any(_SEVERITY_RANK[v.severity] >= needed for v in report.violations)

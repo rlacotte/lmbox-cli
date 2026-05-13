@@ -134,6 +134,30 @@
           }
         },
 
+        "grounding": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Source-grounding contract (Layer D). When mode != off, every source_id field in the agent's structured output must match a source_id actually returned by a tool call during the run. Catches the 'invented source' hallucination class that pure citation verification misses.",
+          "required": ["mode"],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["strict", "warn", "off"],
+              "description": "strict = block the run on any unmatched source_id; warn = report only, do not block (rollout phase); off = disable enforcement entirely."
+            },
+            "source_id_paths": {
+              "type": "array",
+              "description": "Dotted paths into the JSON output where source_id fields live. `*` matches every element of an array. Example: 'precedents.*.source_id'.",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_*.]*$",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            }
+          }
+        },
+
         "tools": {
           "type": "array",
           "default": [],

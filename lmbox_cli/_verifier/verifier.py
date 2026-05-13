@@ -24,9 +24,16 @@ from lmbox_cli._verifier.extractor import (
     find_malformed,
 )
 from lmbox_cli._verifier.legifrance import (
+    LookupResult,
     LookupStatus,
+    lookup_article_code,
     lookup_cassation,
+    lookup_conseil_const,
+    lookup_conseil_etat,
+    lookup_cour_appel,
+    lookup_eu_text,
     lookup_generic,
+    lookup_loi_decret,
 )
 
 
@@ -105,71 +112,11 @@ def verify(
     for c in citations:
         report.citations_total += 1
         if c.kind == CitationKind.PIECE_INTERNE:
-            if pieces_set is None:
-                # Caller didn't pass a pieces list. We can't verify;
-                # surface as MEDIUM so the operator knows.
-                report.violations.append(
-                    Violation(
-                        severity=Severity.MEDIUM,
-                        kind="piece_unverifiable",
-                        citation=c,
-                        detail="Liste des pièces du dossier non fournie au verifier — "
-                        "vérifier manuellement.",
-                    )
-                )
-            elif c.piece_num and c.piece_num not in pieces_set:
-                report.violations.append(
-                    Violation(
-                        severity=Severity.HIGH,
-                        kind="piece_not_in_dossier",
-                        citation=c,
-                        detail=f"Pièce n° {c.piece_num} référencée par l'agent mais "
-                        f"absente du dossier (pièces disponibles : "
-                        f"{sorted(pieces_set, key=lambda x: int(x) if x.isdigit() else 9999)}).",
-                    )
-                )
-            else:
-                report.citations_ok += 1
-
-        elif c.kind == CitationKind.CASSATION and check_external:
-            result = lookup_cassation(c.juridiction or "", c.date or "", c.numero)
-            if result.status == LookupStatus.FOUND:
-                report.citations_ok += 1
-            elif result.status == LookupStatus.NOT_FOUND:
-                report.violations.append(
-                    Violation(
-                        severity=Severity.CRITICAL,
-                        kind="external_not_found",
-                        citation=c,
-                        detail=f"Arrêt non trouvé dans Légifrance — probable hallucination. "
-                        f"({result.message})",
-                    )
-                )
-            else:  # UNVERIFIABLE
-                report.violations.append(
-                    Violation(
-                        severity=Severity.MEDIUM,
-                        kind="external_unverifiable",
-                        citation=c,
-                        detail=result.message,
-                    )
-                )
-
-        elif c.kind in (CitationKind.CONSEIL_ETAT, CitationKind.CONSEIL_CONST,
-                        CitationKind.COUR_APPEL) and check_external:
-            result = lookup_generic(c.juridiction or "", c.date or "", c.numero)
-            report.violations.append(
-                Violation(
-                    severity=Severity.MEDIUM,
-                    kind="external_unverifiable",
-                    citation=c,
-                    detail=result.message,
-                )
-            )
-
+            _check_piece(c, pieces_set, report)
+        elif check_external and c.kind in CitationKind.__members__.values():
+            _check_external(c, report)
         else:
-            # External check skipped or not applicable — count as OK
-            # (we have nothing actionable to report).
+            # External check skipped — count as OK (no actionable signal).
             report.citations_ok += 1
 
     # ─── Malformed citations ─────────────────────────────────
@@ -204,3 +151,112 @@ def verify(
     )
 
     return report
+
+
+# ─── Per-citation handlers ───────────────────────────────────────
+
+
+def _check_piece(
+    c: Citation, pieces_set: set[str] | None, report: VerificationReport
+) -> None:
+    """Verify that every piece referenced is in the dossier inventory.
+
+    Handles single (`Pièce n° 7`), list (`Pièces n°s 4 et 5`) and
+    range (`Pièces n°s 4 à 7`) references uniformly via the
+    `piece_nums` tuple populated by the extractor.
+    """
+    if pieces_set is None:
+        report.violations.append(
+            Violation(
+                severity=Severity.MEDIUM,
+                kind="piece_unverifiable",
+                citation=c,
+                detail="Liste des pièces du dossier non fournie au verifier — "
+                "vérifier manuellement.",
+            )
+        )
+        return
+
+    nums = c.piece_nums or ((c.piece_num,) if c.piece_num else ())
+    missing = [n for n in nums if n and n not in pieces_set]
+    if not missing:
+        report.citations_ok += 1
+        return
+
+    available = sorted(
+        pieces_set, key=lambda x: int(x) if x.isdigit() else 9999
+    )
+    if len(missing) == 1:
+        detail = (
+            f"Pièce n° {missing[0]} référencée par l'agent mais absente du "
+            f"dossier (pièces disponibles : {available})."
+        )
+    else:
+        detail = (
+            f"Pièces n° {missing} référencées par l'agent mais absentes du "
+            f"dossier (pièces disponibles : {available})."
+        )
+    report.violations.append(
+        Violation(
+            severity=Severity.HIGH,
+            kind="piece_not_in_dossier",
+            citation=c,
+            detail=detail,
+        )
+    )
+
+
+def _check_external(c: Citation, report: VerificationReport) -> None:
+    """Route a citation to the right Légifrance/EUR-Lex lookup and
+    translate the result into a Violation severity."""
+    result = _dispatch_lookup(c)
+    if result is None:
+        # Out-of-scope citation kind (e.g. PIECE_INTERNE got here by
+        # mistake, or a new kind without a lookup). Count as OK.
+        report.citations_ok += 1
+        return
+
+    if result.status == LookupStatus.FOUND:
+        report.citations_ok += 1
+    elif result.status == LookupStatus.NOT_FOUND:
+        report.violations.append(
+            Violation(
+                severity=Severity.CRITICAL,
+                kind="external_not_found",
+                citation=c,
+                detail=f"Référence non trouvée — probable hallucination. "
+                f"({result.message})",
+            )
+        )
+    else:  # UNVERIFIABLE
+        report.violations.append(
+            Violation(
+                severity=Severity.MEDIUM,
+                kind="external_unverifiable",
+                citation=c,
+                detail=result.message,
+            )
+        )
+
+
+def _dispatch_lookup(c: Citation) -> LookupResult | None:
+    """Route a Citation to its lookup function. Returns None when the
+    kind has no external check (e.g. PIECE_INTERNE, MALFORMED — those
+    are handled elsewhere)."""
+    if c.kind == CitationKind.CASSATION:
+        return lookup_cassation(c.juridiction or "", c.date or "", c.numero)
+    if c.kind == CitationKind.CONSEIL_ETAT:
+        return lookup_conseil_etat(c.juridiction or "", c.date or "", c.numero)
+    if c.kind == CitationKind.CONSEIL_CONST:
+        return lookup_conseil_const(c.juridiction or "", c.date or "", c.numero)
+    if c.kind == CitationKind.COUR_APPEL:
+        return lookup_cour_appel(c.juridiction or "", c.date or "", c.numero)
+    if c.kind == CitationKind.ARTICLE_CODE:
+        return lookup_article_code(c.article or "", c.code or "")
+    if c.kind == CitationKind.LOI:
+        return lookup_loi_decret("loi", c.numero or "", c.date or "")
+    if c.kind == CitationKind.DECRET:
+        return lookup_loi_decret("décret", c.numero or "", c.date or "")
+    if c.kind in (CitationKind.EU_REGLEMENT, CitationKind.EU_DIRECTIVE):
+        return lookup_eu_text(c.eu_celex or "")
+    return None

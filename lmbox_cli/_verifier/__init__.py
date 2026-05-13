@@ -41,6 +41,7 @@ the report, let the operator decide.
 
 from __future__ import annotations
 
+from lmbox_cli._verifier.streaming import StreamingVerifier, verify_stream
 from lmbox_cli._verifier.verifier import (
     Severity,
     VerificationReport,
@@ -48,4 +49,11 @@ from lmbox_cli._verifier.verifier import (
     verify,
 )
 
-__all__ = ["Severity", "VerificationReport", "Violation", "verify"]
+__all__ = [
+    "Severity",
+    "StreamingVerifier",
+    "VerificationReport",
+    "Violation",
+    "verify",
+    "verify_stream",
+]
