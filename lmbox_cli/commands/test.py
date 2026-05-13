@@ -81,6 +81,14 @@ def cmd(
         envvar="LMBOX_LLM_TIMEOUT",
         help="Per-request timeout in seconds. Bump on slow CPU backends.",
     ),
+    strict: bool = typer.Option(
+        False,
+        "--strict",
+        help="After each case, run the citation verifier on the LLM output. "
+        "Any HIGH/CRITICAL violation (hallucinated arrêt, invented Pièce n°, "
+        "malformed citation) fails the case even if the golden assertions pass. "
+        "Use on legal agents to catch hallucinations the goldens alone miss.",
+    ),
 ) -> None:
     """Run the agent's golden eval suite against a local or remote LLM."""
 
@@ -151,12 +159,41 @@ def cmd(
 
         def _on_done(cr: CaseResult) -> None:
             results.append(cr)
+            # In --strict mode, run the citation verifier on the
+            # LLM response. Any CRITICAL/HIGH violation flips the
+            # case to failed even if the golden assertions passed.
+            verifier_summary = ""
+            if strict and cr.response and not cr.error:
+                from lmbox_cli._verifier import Severity, verify as run_verify
+
+                v_report = run_verify(cr.response, pieces=None, check_external=False)
+                blocked = [
+                    v for v in v_report.violations
+                    if v.severity in (Severity.HIGH, Severity.CRITICAL)
+                ]
+                if blocked:
+                    # Mutate the case result : eval was OK but the
+                    # verifier blocked it. We can't reassign frozen
+                    # dataclass fields, so we just print explicitly
+                    # and let _print_summary count via a side channel.
+                    cr.verifier_blocked = blocked  # attached dynamically
+                    cr.passed = False
+                    verifier_summary = (
+                        f"  [red]VERIFIER:[/red] {len(blocked)} hallucination(s)"
+                    )
+
             mark = "[green]✓[/green]" if cr.passed else "[red]✗[/red]"
-            progress.console.print(f"  {mark} {cr.case.display_id}")
+            progress.console.print(f"  {mark} {cr.case.display_id}{verifier_summary}")
             if show_response and cr.response:
                 progress.console.print(f"    [dim]{cr.response[:200]}…[/dim]")
             if cr.error:
                 progress.console.print(f"    [red]ERROR:[/red] {cr.error}")
+            if strict and getattr(cr, "verifier_blocked", None):
+                for v in cr.verifier_blocked[:3]:
+                    progress.console.print(
+                        f"    [yellow]→[/yellow] {v.severity.value.upper()} "
+                        f"{v.kind} :: {v.citation.raw}"
+                    )
             progress.advance(task)
 
         eval_result = run(

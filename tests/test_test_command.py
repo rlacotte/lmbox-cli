@@ -37,7 +37,7 @@ def fake_llm(monkeypatch: pytest.MonkeyPatch) -> FakeLLMClient:
     """Replace the real client factory in `commands.test`."""
     client = FakeLLMClient()
 
-    def fake_from_env(*, endpoint=None, api_key=None):
+    def fake_from_env(*, endpoint=None, api_key=None, timeout=None):
         return client
 
     monkeypatch.setattr(test_cmd, "from_env", fake_from_env)

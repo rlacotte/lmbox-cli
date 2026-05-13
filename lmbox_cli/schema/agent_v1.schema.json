@@ -115,6 +115,25 @@
           }
         },
 
+        "output_format": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Optional structured-output contract. When set, the runtime forces the LLM to emit JSON matching the declared schema (via the OpenAI-compatible response_format=json_schema parameter on backends that support it; falls back to prompt-only enforcement otherwise).",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["markdown", "json_schema"],
+              "description": "`markdown` (default — free-form text) or `json_schema` (structured output, validated post-generation)."
+            },
+            "schema": {
+              "type": "object",
+              "description": "JSON Schema describing the expected output shape. Required when kind=json_schema. The runtime validates the LLM output against this before returning to the caller — invalid output triggers a re-prompt up to 2 retries.",
+              "additionalProperties": true
+            }
+          }
+        },
+
         "tools": {
           "type": "array",
           "default": [],

@@ -11,7 +11,7 @@ import typer
 from rich.console import Console
 
 from lmbox_cli import __version__
-from lmbox_cli.commands import build, deploy, new, pack, test, validate
+from lmbox_cli.commands import build, deploy, new, pack, test, validate, verify
 
 console = Console()
 
@@ -41,6 +41,7 @@ agent_app.command("test")(test.cmd)
 agent_app.command("build")(build.cmd)
 agent_app.command("pack")(pack.cmd)
 agent_app.command("deploy")(deploy.cmd)
+agent_app.command("verify")(verify.cmd)
 
 
 @app.callback(invoke_without_command=True)
