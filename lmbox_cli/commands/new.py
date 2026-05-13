@@ -160,6 +160,40 @@ def _scaffold(src: Path, dest: Path, context: dict[str, str]) -> None:
             shutil.copyfile(src_path, target)
 
 
+# Tokens that should keep their canonical casing in display names —
+# acronyms (NDA, KYB) and brand-style words. Add to this list as the
+# catalogue grows; the override stays small enough to eyeball.
+_DISPLAY_CASE_OVERRIDES = {
+    "nda": "NDA",
+    "kyb": "KYB",
+    "kyc": "KYC",
+    "msa": "MSA",
+    "sow": "SOW",
+    "rgpd": "RGPD",
+    "soc2": "SOC2",
+    "hds": "HDS",
+    "owui": "OWUI",
+    "llm": "LLM",
+    "ia": "IA",
+    "ai": "AI",
+    "api": "API",
+    "ml": "ML",
+    "osint": "OSINT",
+    "ubo": "UBO",
+    "rh": "RH",
+    "ops": "Ops",
+}
+
+
 def _humanize(slug: str) -> str:
-    """Convert kebab-case-slug → 'Kebab Case Slug' for display_name default."""
-    return " ".join(word.capitalize() for word in slug.split("-"))
+    """Convert kebab-case-slug → "Kebab Case Slug" for display_name default.
+
+    Acronyms in `_DISPLAY_CASE_OVERRIDES` keep their canonical
+    casing (e.g. `nda-reviewer` → "NDA Reviewer", not
+    "Nda Reviewer"). Partners can always override the default in
+    `manifest.yaml` after scaffolding.
+    """
+    parts = []
+    for word in slug.split("-"):
+        parts.append(_DISPLAY_CASE_OVERRIDES.get(word.lower(), word.capitalize()))
+    return " ".join(parts)
