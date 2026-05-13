@@ -75,6 +75,12 @@ def cmd(
         "--show-response",
         help="Print each LLM response in full (verbose; useful for prompt debugging).",
     ),
+    timeout: float = typer.Option(
+        180.0,
+        "--timeout",
+        envvar="LMBOX_LLM_TIMEOUT",
+        help="Per-request timeout in seconds. Bump on slow CPU backends.",
+    ),
 ) -> None:
     """Run the agent's golden eval suite against a local or remote LLM."""
 
@@ -129,7 +135,7 @@ def cmd(
         return
 
     # ─── Real run ─────────────────────────────────────────────
-    client = from_env(endpoint=endpoint, api_key=api_key)
+    client = from_env(endpoint=endpoint, api_key=api_key, timeout=timeout)
 
     results = []
     with Progress(

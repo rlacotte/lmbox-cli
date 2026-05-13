@@ -105,14 +105,26 @@ class OpenAIClient:
         )
 
 
-def from_env(*, endpoint: str | None = None, api_key: str | None = None) -> OpenAIClient:
+def from_env(
+    *,
+    endpoint: str | None = None,
+    api_key: str | None = None,
+    timeout: float | None = None,
+) -> OpenAIClient:
     """Build a client from CLI args + env vars, with sensible defaults.
 
     Resolution order (highest first):
     1. Explicit argument passed to this function.
-    2. Env var (LMBOX_LLM_ENDPOINT / LMBOX_LLM_API_KEY).
-    3. Default (Ollama local — http://localhost:11434, no auth).
+    2. Env var (LMBOX_LLM_ENDPOINT / LMBOX_LLM_API_KEY / LMBOX_LLM_TIMEOUT).
+    3. Default (Ollama local — http://localhost:11434, no auth, 180 s timeout).
+
+    The default timeout (180 s) is intentionally generous so that
+    small CPU-only models (qwen2.5:3b on a 4-vCPU Scaleway PRO2-XS,
+    for example) can comfortably finish a multi-paragraph response
+    even with a 5 KB system prompt. Override with --timeout / env var
+    when targeting a GPU backend where 30 s is plenty.
     """
     resolved_endpoint = endpoint or os.environ.get("LMBOX_LLM_ENDPOINT") or "http://localhost:11434"
     resolved_key = api_key or os.environ.get("LMBOX_LLM_API_KEY") or ""
-    return OpenAIClient(resolved_endpoint, resolved_key)
+    resolved_timeout = timeout if timeout is not None else float(os.environ.get("LMBOX_LLM_TIMEOUT", "180"))
+    return OpenAIClient(resolved_endpoint, resolved_key, timeout=resolved_timeout)
