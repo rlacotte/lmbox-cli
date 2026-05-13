@@ -123,11 +123,21 @@ class OpenClawAdapter:
         # Default OpenClaw frontmatter
         fm: dict[str, Any] = {
             "name": md["slug"],
+            # display-name surfaces the partner-facing label in OWUI
+            # dropdowns and the LMbox portal. Top-level (not under
+            # metadata.lmbox) so unrelated tooling (openclaw control
+            # ui, partner CLI listing) finds it without a deep walk.
+            "display-name": md.get("display_name", md["slug"]),
             "description": md["description"],
             "user-invocable": True,
             "disable-model-invocation": False,
             "metadata": {
                 "lmbox": {
+                    # display_name is the partner-facing label shown in
+                    # OWUI / portal dropdowns. The OWUI persona
+                    # registration script reads this; without it,
+                    # users see the slug instead of "NDA Reviewer".
+                    "display_name": md.get("display_name", md["slug"]),
                     "version": md["version"],
                     "vendor": md["vendor"],
                     "vertical": md.get("vertical", "generic"),
