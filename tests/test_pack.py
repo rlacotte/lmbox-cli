@@ -232,3 +232,62 @@ def test_cli_pack_no_hmac_flag_overrides_env(tmp_path: Path, monkeypatch) -> Non
     sidecar = next((agent / ".dist").glob("*.lmbox.json"))
     data = json.loads(sidecar.read_text())
     assert data["hmac_sha256"] is None
+
+
+def test_pack_bundle_distributor_partner_slug(tmp_path: Path) -> None:
+    """`distributor_partner_slug` is inscribed in the sidecar."""
+    build = _stage_build_dir(tmp_path)
+    out = tmp_path / "out"
+    bundle = pack(
+        build_dir=build,
+        manifest=_minimal_manifest(),
+        output_dir=out,
+        distributor_partner_slug="magellan",
+    )
+    sidecar = json.loads(bundle.sidecar.read_text(encoding="utf-8"))
+    assert sidecar["distributor_partner_slug"] == "magellan"
+
+
+def test_pack_bundle_lmbox_signature(tmp_path: Path) -> None:
+    """`lmbox_signature` is inscribed in the sidecar."""
+    build = _stage_build_dir(tmp_path)
+    out = tmp_path / "out"
+    bundle = pack(
+        build_dir=build,
+        manifest=_minimal_manifest(),
+        output_dir=out,
+        lmbox_signature="lmbox-mp-1.deadbeef" + "0" * 56,
+    )
+    sidecar = json.loads(bundle.sidecar.read_text(encoding="utf-8"))
+    assert sidecar["lmbox_signature"].startswith("lmbox-mp-1.")
+
+
+def test_pack_bundle_no_attribution(tmp_path: Path) -> None:
+    """Without the new flags, sidecar carries None for both fields."""
+    build = _stage_build_dir(tmp_path)
+    out = tmp_path / "out"
+    bundle = pack(build_dir=build, manifest=_minimal_manifest(), output_dir=out)
+    sidecar = json.loads(bundle.sidecar.read_text(encoding="utf-8"))
+    assert sidecar["distributor_partner_slug"] is None
+    assert sidecar["lmbox_signature"] is None
+
+
+def test_cli_pack_with_as_distributor(tmp_path: Path) -> None:
+    """`lmbox agent pack --as-distributor sopra` writes the slug to sidecar."""
+    agent = _scaffold_and_build(tmp_path)
+    res = runner.invoke(app, ["agent", "pack", str(agent), "--as-distributor", "sopra"])
+    assert res.exit_code == 0, res.stdout
+    sidecar = next((agent / ".dist").glob("*.lmbox.json"))
+    data = json.loads(sidecar.read_text())
+    assert data["distributor_partner_slug"] == "sopra"
+
+
+def test_cli_pack_with_lmbox_signature_env(tmp_path: Path, monkeypatch) -> None:
+    """LMBOX_AGENT_SIGNATURE env is read by --lmbox-signature."""
+    agent = _scaffold_and_build(tmp_path)
+    monkeypatch.setenv("LMBOX_AGENT_SIGNATURE", "lmbox-mp-1.test-sig")
+    res = runner.invoke(app, ["agent", "pack", str(agent)])
+    assert res.exit_code == 0, res.stdout
+    sidecar = next((agent / ".dist").glob("*.lmbox.json"))
+    data = json.loads(sidecar.read_text())
+    assert data["lmbox_signature"] == "lmbox-mp-1.test-sig"

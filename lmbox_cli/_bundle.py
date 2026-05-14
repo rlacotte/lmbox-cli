@@ -53,6 +53,8 @@ def pack(
     manifest: dict[str, Any],
     output_dir: Path,
     hmac_key: bytes | None = None,
+    distributor_partner_slug: str | None = None,
+    lmbox_signature: str | None = None,
 ) -> Bundle:
     """Pack a build directory into a signed .lmbox bundle.
 
@@ -129,6 +131,16 @@ def pack(
         "size_bytes": len(data),
         "sha256": sha,
         "hmac_sha256": hm,
+        # Slug du partner distributor (Sopra, Magellan, …) qui installe
+        # cet agent. Le cloud LMbox attribue le revenue share marketplace
+        # à ce partner. Optionnel : si None, fallback côté cloud sur
+        # box.customer.partner.
+        "distributor_partner_slug": distributor_partner_slug,
+        # Signature HMAC LMbox du bundle, requise pour les agents
+        # marketplace publiés. Le cloud refuse l'install si le slug+version
+        # match un MarketplaceAgent published mais que la signature
+        # manque ou ne match pas.
+        "lmbox_signature": lmbox_signature,
         "manifest_snapshot": manifest,
     }
     sidecar_path.write_text(

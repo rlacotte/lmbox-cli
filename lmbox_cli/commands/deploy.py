@@ -93,6 +93,30 @@ def cmd(
         "--hmac-key-env",
         help="Env var name for the HMAC signing key.",
     ),
+    as_distributor: str | None = typer.Option(
+        None,
+        "--as-distributor",
+        envvar="LMBOX_AS_DISTRIBUTOR",
+        help=(
+            "Slug du partner distributor LMbox (sopra, magellan, …) qui "
+            "installe cet agent. Inscrit dans le sidecar pour attribution "
+            "automatique du revenue share marketplace côté cloud. "
+            "Optionnel : si omis, le cloud retombe sur le partenaire "
+            "attaché au customer de la box (box.customer.partner) ; "
+            "sinon, pas de revenue share vendor."
+        ),
+    ),
+    lmbox_signature: str | None = typer.Option(
+        None,
+        "--lmbox-signature",
+        envvar="LMBOX_AGENT_SIGNATURE",
+        help=(
+            "Signature HMAC LMbox du bundle, requise pour les agents "
+            "marketplace publiés. Émise par /admin/marketplace/:id/publish "
+            "côté LMbox cloud (commence par 'lmbox-mp-1.'). Inutile pour "
+            "les agents partner en cours de dev."
+        ),
+    ),
 ) -> None:
     """Deploy a built agent to a target LMbox appliance."""
 
@@ -144,6 +168,8 @@ def cmd(
             manifest=manifest,
             output_dir=dist_dir,
             hmac_key=hmac_key,
+            distributor_partner_slug=as_distributor,
+            lmbox_signature=lmbox_signature,
         )
     except FileNotFoundError as exc:
         console.print(f"[red]Pack failed:[/red] {exc}")

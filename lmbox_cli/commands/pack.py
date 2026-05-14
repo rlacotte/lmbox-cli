@@ -65,6 +65,26 @@ def cmd(
         "--no-hmac",
         help="Skip HMAC signing even if the key is set. Sidecar carries only sha256.",
     ),
+    as_distributor: str | None = typer.Option(
+        None,
+        "--as-distributor",
+        envvar="LMBOX_AS_DISTRIBUTOR",
+        help=(
+            "Slug du partner distributor LMbox qui installera l'agent. "
+            "Inscrit dans le sidecar pour attribution revenue share marketplace "
+            "côté cloud LMbox. Optionnel."
+        ),
+    ),
+    lmbox_signature: str | None = typer.Option(
+        None,
+        "--lmbox-signature",
+        envvar="LMBOX_AGENT_SIGNATURE",
+        help=(
+            "Signature HMAC LMbox du bundle (commence par 'lmbox-mp-1.'), "
+            "requise pour les agents marketplace publiés. Émise par "
+            "/admin/marketplace/:id/publish côté cloud."
+        ),
+    ),
 ) -> None:
     """Pack a built agent into a reproducible .lmbox tarball."""
 
@@ -110,6 +130,8 @@ def cmd(
             manifest=manifest,
             output_dir=out,
             hmac_key=hmac_key,
+            distributor_partner_slug=as_distributor,
+            lmbox_signature=lmbox_signature,
         )
     except FileNotFoundError as exc:
         console.print(f"[red]Pack failed:[/red] {exc}")
